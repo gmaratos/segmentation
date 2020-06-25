@@ -1,3 +1,5 @@
 data
 env
+*.swp
 prepare/__pycache__
+prepare/*.swp
