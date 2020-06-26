@@ -1,6 +1,5 @@
 data
 env
-*.swp
-prepare/__pycache__
-prepare/*.swp
+**/*.swp
+**/__pycache__
 sample_images
