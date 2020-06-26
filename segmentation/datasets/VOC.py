@@ -8,12 +8,7 @@ import torchvision.transforms.functional as TF
 
 import random
 
-def record_pil_image(img):
-    if not os.path.exists('sample_images'):
-        os.makedirs('sample_images')
-
-    name = f"image_{len(os.listdir('sample_images'))}.png"
-    img.save(os.path.join('sample_images', name), 'PNG')
+__all__ = ['VOC']
 
 class Transform:
     """a custom transformer for segmentation image pairs"""
@@ -50,14 +45,14 @@ class Transform:
 
         return image_augmented_tensor, target_augmented_tensor
 
-class VOCDataset(torch.utils.data.Dataset):
+class VOC(torch.utils.data.Dataset):
     """VOC Segmentation dataset object, written by hand because I think the
     transforms are messed up so I am making my own
 
     I still need to set up my validation, I was thinking of using cross
     because the dataset is so small"""
 
-    def __init__(self, root: str, transforms=None):
+    def __init__(self, root: str):
 
         #construct paths and file names
         image_path = os.path.join(root, 'VOC2012', 'JPEGImages')
@@ -72,7 +67,6 @@ class VOCDataset(torch.utils.data.Dataset):
         self.image_path = image_path
         self.target_path = target_path
         self.file_names = file_names
-        self.transforms = transforms
 
     def __len__(self):
         return len(self.file_names)
