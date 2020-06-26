@@ -49,16 +49,20 @@ class VOC(torch.utils.data.Dataset):
     """VOC Segmentation dataset object, written by hand because I think the
     transforms are messed up so I am making my own
 
-    I still need to set up my validation, I was thinking of using cross
-    because the dataset is so small"""
+    I should rebalance the train and validation sets"""
 
-    def __init__(self, root: str):
+    def __init__(self, root: str, split: str):
 
         #construct paths and file names
         image_path = os.path.join(root, 'VOC2012', 'JPEGImages')
         target_path = os.path.join(root, 'VOC2012', 'SegmentationClass')
         #extract files names from target because jpegimages has many unlabled images
-        file_names = [line.split('.')[0].strip() for line in os.listdir(target_path)]
+        annotation_path = os.path.join(
+            root, 'VOC2012', 'ImageSets', 'Segmentation', split+'.txt'
+        )
+        with open(annotation_path, 'r') as f:
+            file_names = [line.strip() for line in f.readlines()]
+
         #future optimization could be to build static name list input/target
         #instead of constructing the paths on the fly in __getitem__
 
@@ -67,6 +71,7 @@ class VOC(torch.utils.data.Dataset):
         self.image_path = image_path
         self.target_path = target_path
         self.file_names = file_names
+        self.num_classes = 21
 
     def __len__(self):
         return len(self.file_names)
