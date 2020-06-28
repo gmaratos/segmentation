@@ -113,7 +113,8 @@ def fit(args, num_workers=0):
             'optimizer': optimizer.state_dict(),
             'lr_scheduler': lr_scheduler.state_dict(),
             'epoch': epoch,
-            'args': args
+            'args': args,
+            'model_name': model_name,
         }, os.path.join(root_path, f'{epoch}.pth'))
 
 def parse_args():
