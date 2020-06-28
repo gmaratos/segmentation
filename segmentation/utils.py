@@ -1,20 +1,24 @@
 import os
+import tqdm
 import torch
 import torch.distributed as dist
 
 __all__ = ['ConfusionMatrix']
 
 def create_dir(name: str):
+    """create a directory if it does not already exist"""
     if not os.path.exists(name):
         os.makedirs(name)
 
 def record_pil_image(img):
+    """save images to the sample directory. I used this mostly for testing
+    image augmentations"""
     create_dir('sample_images')
 
     name = f"image_{len(os.listdir('sample_images'))}.png"
     img.save(os.path.join('sample_images', name), 'PNG')
 
-#functions for combining the VOC batches
+#functions taken from pytorch for building a batch from the dataset
 def cat_list(images, fill_value=0):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in images]))
     batch_shape = (len(images),) + max_size
@@ -29,8 +33,10 @@ def collate_fn(batch):
     batched_imgs = cat_list(images, fill_value=0)
     batched_targets = cat_list(targets, fill_value=255)
     return batched_imgs, batched_targets
+#end of pytorch functions
 
 def build_dataloaders(train_dataset, train_sampler, test_dataset, test_sampler, batch_size, num_workers=0):
+    """constructs the dataloader objects from the datasets and samplers"""
     #create data loaders
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size,
@@ -45,7 +51,7 @@ def build_dataloaders(train_dataset, train_sampler, test_dataset, test_sampler, 
     return train_dataloader, test_dataloader
 
 class ConfusionMatrix:
-    """this is just ripped from the pytorch reference"""
+    """used in evaluation, when calculating IoU"""
     def __init__(self, num_classes):
         self.num_classes = num_classes
         self.mat = None
@@ -91,6 +97,7 @@ class ConfusionMatrix:
                 ['{:.1f}'.format(i) for i in (iu * 100).tolist()],
                 iu.mean().item() * 100)
 
+#taken from pytorch for distributed processing
 def setup_for_distributed(is_master):
     """
     This function disables printing when not in master process
@@ -128,10 +135,55 @@ def init_distributed_mode(args):
         rank=args.rank,
     )
     setup_for_distributed(args.rank == 0)
+#end of distributed
 
 def save_on_master(*args, **kwargs):
+    """save all information about the model that is relevant, taken from pytorch"""
     if dist.is_available() and dist.is_initialized():
         if dist.get_rank() == 0:
             torch.save(*args, **kwargs)
     else:
         torch.save(**args, **kwargs)
+
+def forward_pass(model, dataloader, criterion, optimizer, lr_scheduler, device, train=False):
+    """ forward pass infers the number of classes, for evaluation, from the dataset
+    object. Run a single forward pass over the data """
+
+    #training pass
+    if train:
+        model.train()
+        t, losses = tqdm.tqdm(dataloader, leave=True), []
+        for (x, y) in t:
+            t.set_description(desc='Train')
+            #forward pass on batch
+            x, y = x.to(device), y.to(device)
+            prediction = model(x)['out']
+            loss = criterion(prediction, y)
+
+            #update parameters
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+
+            #loss.item() is called twice!
+            t.set_postfix(loss=f'{loss.item():.3e}')
+            losses.append(loss.item())
+        return sum(losses)/len(losses)
+    else:
+        #evaluation
+        num_classes = dataloader.dataset.num_classes
+        confmat = ConfusionMatrix(num_classes)
+        model.eval()
+        t = tqdm.tqdm(dataloader, leave=True)
+        with torch.no_grad():
+            for (x, y) in t:
+                t.set_description(desc='Test')
+                #forward pass on batch
+                x, y = x.to(device), y.to(device)
+                prediction = model(x)['out']
+
+                confmat.update(y.flatten(), prediction.argmax(1).flatten())
+            confmat.reduce_from_all_processes()
+
+        return confmat

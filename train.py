@@ -9,49 +9,6 @@ import torch.nn.functional as F
 def criterion_fn(inputs, target):
     return F.cross_entropy(inputs, target, ignore_index=255)
 
-def forward_pass(model, dataloader, criterion, optimizer, lr_scheduler, device, train=False):
-    """ forward pass infers the number of classes, for evaluation, from the dataset
-    object """
-
-    #training pass
-    if train:
-        model.train()
-        t, losses = tqdm.tqdm(dataloader, leave=True), []
-        for (x, y) in t:
-            t.set_description(desc='Train')
-            #forward pass on batch
-            x, y = x.to(device), y.to(device)
-            prediction = model(x)['out']
-            loss = criterion(prediction, y)
-
-            #update parameters
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-
-            #loss.item() is called twice!
-            t.set_postfix(loss=f'{loss.item():.3e}')
-            losses.append(loss.item())
-        return sum(losses)/len(losses)
-    else:
-        #evaluation
-        num_classes = dataloader.dataset.num_classes
-        confmat = segmentation.utils.ConfusionMatrix(num_classes)
-        model.eval()
-        t = tqdm.tqdm(dataloader, leave=True)
-        with torch.no_grad():
-            for (x, y) in t:
-                t.set_description(desc='Test')
-                #forward pass on batch
-                x, y = x.to(device), y.to(device)
-                prediction = model(x)['out']
-
-                confmat.update(y.flatten(), prediction.argmax(1).flatten())
-            confmat.reduce_from_all_processes()
-
-        return confmat
-
 def fit(args, num_workers=0):
 
     #extract some args
@@ -136,14 +93,14 @@ def fit(args, num_workers=0):
     for epoch in range(start_epoch, epochs+1):
         print(f'Start of Epoch {epoch}')
         #train pass
-        loss = forward_pass(
+        loss = segmentation.utils.forward_pass(
             model, train_dataloader,
             criterion_fn, optimizer, lr_scheduler,
             device, train = True
         )
         print(f'\tFinal loss: {loss:.3e}')
         #evaluation
-        result = forward_pass(
+        result = segmentation.utils.forward_pass(
             model, train_dataloader,
             criterion_fn, optimizer, lr_scheduler,
             device, train = False
