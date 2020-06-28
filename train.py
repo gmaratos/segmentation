@@ -115,6 +115,7 @@ def fit(args, num_workers=0):
             'epoch': epoch,
             'args': args,
             'model_name': model_name,
+            'num_classes': train_dataset.num_classes,
         }, os.path.join(root_path, f'{epoch}.pth'))
 
 def parse_args():
