@@ -35,20 +35,13 @@ def collate_fn(batch):
     return batched_imgs, batched_targets
 #end of pytorch functions
 
-def build_dataloaders(train_dataset, train_sampler, test_dataset, test_sampler, batch_size, num_workers=0):
-    """constructs the dataloader objects from the datasets and samplers"""
-    #create data loaders
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=batch_size,
-        sampler=train_sampler, num_workers=num_workers,
+def build_dataloader(dataset, sampler, batch_size, num_workers=0):
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=batch_size,
+        sampler=sampler, num_workers=num_workers,
         collate_fn=collate_fn, drop_last=True,
     )
-    test_dataloader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=batch_size,
-        sampler=test_sampler, num_workers=num_workers,
-        collate_fn=collate_fn
-    )
-    return train_dataloader, test_dataloader
+    return dataloader
 
 class ConfusionMatrix:
     """used in evaluation, when calculating IoU"""

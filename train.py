@@ -43,9 +43,11 @@ def fit(args, num_workers=0):
         test_sampler = torch.utils.data.SequentialSampler(test_dataset)
 
     #create data loaders
-    train_dataloader, test_dataloader = segmentation.utils.build_dataloaders(
-        train_dataset, train_sampler, test_dataset, test_sampler,
-        batch_size,
+    train_dataloader = segmentation.utils.build_dataloader(
+        train_dataset, train_sampler, batch_size
+    )
+    test_dataloader = segmentation.utils.build_dataloader(
+        test_dataset, test_sampler, batch_size
     )
 
     #create model, also initialize some things for parallelism if used
@@ -113,9 +115,7 @@ def fit(args, num_workers=0):
             'optimizer': optimizer.state_dict(),
             'lr_scheduler': lr_scheduler.state_dict(),
             'epoch': epoch,
-            'args': args,
-            'model_name': model_name,
-            'num_classes': train_dataset.num_classes,
+            'args': args
         }, os.path.join(root_path, f'{epoch}.pth'))
 
 def parse_args():

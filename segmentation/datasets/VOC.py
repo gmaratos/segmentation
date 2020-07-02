@@ -12,26 +12,37 @@ __all__ = ['VOC']
 
 class Transform:
     """a custom transformer for segmentation image pairs"""
-    def __init__(self, size): #size is a tuple representing the final image dimension
+    def __init__(self, size, aug=False): #size is a tuple representing the final image dim
         self.size = size
         self.nrmlz = TT.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.aug = aug
 
     def __call__(self, image, target):
 
-        #apply random resize crop
-        rrcrop = TT.RandomResizedCrop(self.size)
-        (i, j, h, w) = rrcrop.get_params(image, rrcrop.scale, rrcrop.ratio)
-        image_augmented = TF.resized_crop(image, i, j, h, w, self.size, Image.NEAREST)
-        target_augmented = TF.resized_crop(target, i, j, h, w, self.size, Image.NEAREST)
+        image_augmented = image
+        target_augmented = target
+        if self.aug:
+            #apply random resize crop
+            rrcrop = TT.RandomResizedCrop(self.size)
+            (i, j, h, w) = rrcrop.get_params(image, rrcrop.scale, rrcrop.ratio)
+            image_augmented = TF.resized_crop(image, i, j, h, w, self.size, Image.NEAREST)
+            target_augmented = TF.resized_crop(target, i, j, h, w, self.size, Image.NEAREST)
 
-        #apply random flips
-        if random.random() > 0.5:
-            image_augmented = TF.hflip(image_augmented)
-            target_augmented = TF.hflip(target_augmented)
+            #apply random flips
+            if random.random() > 0.5:
+                image_augmented = TF.hflip(image_augmented)
+                target_augmented = TF.hflip(target_augmented)
 
-        if random.random() > 0.5:
-            image_augmented = TF.vflip(image_augmented)
-            target_augmented = TF.vflip(target_augmented)
+            if random.random() > 0.5:
+                image_augmented = TF.vflip(image_augmented)
+                target_augmented = TF.vflip(target_augmented)
+        else:
+            image_augmented = TF.resize(
+                image_augmented, self.size, interpolation=Image.NEAREST
+            )
+            target_augmented = TF.resize(
+                target_augmented, self.size, interpolation=Image.NEAREST
+            )
 
         #Make tensor
         image_augmented_tensor = TF.to_tensor(image_augmented)
@@ -67,7 +78,20 @@ class VOC(torch.utils.data.Dataset):
         #instead of constructing the paths on the fly in __getitem__
 
         #build transformer (for data augmentations)
-        self.transform = Transform((480, 480))
+        if split == 'train' or split == 'trainval':
+            self.transform = Transform((480, 480), aug=True)
+        else: #split is test
+            self.transform = Transform((480, 480), aug=False)
+
+        #add the class labels for building a mapping for use later
+        class_names = [
+            'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car',
+            'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike', 'person',
+            'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor'
+        ]
+        self.id_2_class = {x:y for (x, y) in enumerate(class_names)}
+        self.class_2_id = {y:x for (x, y) in enumerate(class_names)}
+
         self.image_path = image_path
         self.target_path = target_path
         self.file_names = file_names
@@ -89,3 +113,4 @@ class VOC(torch.utils.data.Dataset):
         image, target = self.transform(image, target)
 
         return image, target
+
